@@ -1,16 +1,22 @@
-var serviceLocator = require('service-locator').createServiceLocator()
-  , articleFixtures = require('fleet-street/test/article/fixtures')
+var articleFixtures = require('fleet-street/test/article/fixtures')
   , async = require('async')
   , should = require('should')
+  , saveMongodb = require('save-mongodb')
   , _ = require('lodash')
-  , uberCache = require('uber-cache')
-  , imageFixtures = require('fleet-street/test/lib/fixtures/crop-config')
+  , nullLogger = require('mc-logger')
+  // , uberCache = require('uber-cache')
   , createTeaserPopulator = require('../teaser-populator')
+  , createDedupeAggregator = require('cf-dedupe-list-aggregator')
   , teaserPopulator
   , hierarchyBuilder = require('fleet-street/lib/hierarchy-builders/section')
   , slugUniquer = 1
   // Global to allow checks once articles are created
   , articles = [[],[]]
+  , dbConnect = require('./db-connection')
+  , sectionService
+  , articleService
+  , tagService
+  , listService
 
 function createSections(lists, cb) {
 
@@ -31,7 +37,7 @@ function createSections(lists, cb) {
         , teaserLists: { testTeaser: { lists: [ lists[0]._id ] } } }
       , { name: 'Section C', visible: true, slug: 'C', displayInNav: true, order: 4 }
       ]
-  async.map(topLevel, serviceLocator.sectionService.create, function (err, results) {
+  async.map(topLevel, sectionService.create, function (err, results) {
     var secondLevel =
       [ { name: 'Sub Section B.1'
         , visible: true
@@ -47,7 +53,7 @@ function createSections(lists, cb) {
         , teaserLists: { testTeaser: { lists: [ lists[0]._id ] } }
         }
       ]
-    async.map(secondLevel, serviceLocator.sectionService.create, function (err, results) {
+    async.map(secondLevel, sectionService.create, function (err, results) {
       var thirdLevel =
         [ { name: 'Sub-sub Section B.1a'
           , visible: true
@@ -63,7 +69,7 @@ function createSections(lists, cb) {
           , teaserLists: { testTeaser: { lists: [ lists[0]._id ] } }
           }
         ]
-      async.map(thirdLevel, serviceLocator.sectionService.create, function (err) {
+      async.map(thirdLevel, sectionService.create, function (err) {
         cb(err)
       })
     })
@@ -87,9 +93,9 @@ function createList(cb) {
   , publishedArticleMaker(articles[1])
   , function (cb) {
       // Get the first 2 articles from second list, and duplicate to test list
-      articles[0] = articles[0].concat(articles[1].slice(0,2))
+      articles[0] = articles[0].concat(articles[1].slice(0, 2))
 
-      serviceLocator.listService.create(
+      listService.create(
           { type: 'manual'
           , name: 'test list'
           , articles: articles[0]
@@ -101,7 +107,7 @@ function createList(cb) {
           })
     }
   , function (cb) {
-      serviceLocator.listService.create(
+      listService.create(
           { type: 'manual'
           , name: 'second list'
           , articles: articles[1]
@@ -126,7 +132,7 @@ function publishedArticleMaker(articles, custom) {
     model.slug += slugUniquer
     slugUniquer++
 
-    serviceLocator.articleService.create(model, function (err, result) {
+    articleService.create(model, function (err, result) {
       if (err) return cb(err)
       articles.push(_.extend({}, { articleId: result._id }, custom))
       cb(null)
@@ -134,46 +140,29 @@ function publishedArticleMaker(articles, custom) {
   }
 }
 
+
 describe('Teaser Populator', function () {
 
   // Initialize the mongo database
   before(function (done) {
 
-    require('../../mongodb-bootstrap')(serviceLocator, function (error, sl) {
-      serviceLocator = sl
+    dbConnect.connect(function (error, db) {
 
-      serviceLocator.persistence
-        .register('article')
-        .register('tag')
-        .register('section')
+      function persistence(name) {
+        return saveMongodb(db.collection(name + Date.now()))
+      }
 
-      serviceLocator.properties.images =
-        { article: imageFixtures.standard
-        }
+      articleService = require('./mock-article-service')(persistence('article'))
+      tagService = require('./mock-tag-service')(persistence('tag'))
+      sectionService = require('./mock-section-service')(persistence('section'))
+      listService = require('./mock-list-service')
 
-      serviceLocator.properties.darkroomApiUrl = 'darkroomApiUrlStub'
-      serviceLocator.properties.darkroomSalt = 'darkroomSaltStub'
+        // .register('cache', uberCache())
 
-      serviceLocator
-        .register('articleService', require('../../../bundles/article/service')(serviceLocator))
-        .register('tagService', require('../../../bundles/tag/service')(serviceLocator))
-        .register('sectionService', require('../../../bundles/section/service')(serviceLocator))
-        .register('cache', uberCache())
+      var aggregate = createDedupeAggregator(listService, sectionService,
+        articleService, { logger: nullLogger })
 
-      var lists = {}
-        ,  id = 0
-      serviceLocator.register('listService',
-        { read: function (id, cb) {
-            cb(null, lists[id])
-          }
-        , create: function (list, cb) {
-            var _id = '_' + id++
-            lists[_id] = list
-            cb(null, _.extend({ _id: _id }, list))
-          }
-        })
-
-      teaserPopulator = createTeaserPopulator(serviceLocator)
+      teaserPopulator = createTeaserPopulator(aggregate)
       createList(function (err, lists) {
         if (err) return done(err)
         createSections(lists, function (err) {
@@ -185,15 +174,13 @@ describe('Teaser Populator', function () {
 
   })
 
-  after(function (done) {
-    serviceLocator.serviceDatabaseConnection.dropDatabase(done)
-  })
+  after(dbConnect.disconnect)
 
   describe('populate()', function () {
 
     it('should swap out each array of ids on the teaserList property for actual articles', function (done) {
 
-      hierarchyBuilder(serviceLocator.sectionService)({}, function (err, hierarchy) {
+      hierarchyBuilder(sectionService)({}, function (err, hierarchy) {
         if (err) return done(err)
         teaserPopulator(hierarchy, function (err, sections) {
           if (err) return done(err)
@@ -225,7 +212,7 @@ describe('Teaser Populator', function () {
 
     it('should not go deeper than maxDepth', function (done) {
 
-      hierarchyBuilder(serviceLocator.sectionService)({}, function (err, hierarchy) {
+      hierarchyBuilder(sectionService)({}, function (err, hierarchy) {
         if (err) return done(err)
         teaserPopulator(hierarchy, 1, function (err, sections) {
           if (err) return done(err)
@@ -245,7 +232,7 @@ describe('Teaser Populator', function () {
 
     it('should only retrieve the desiredLists if present', function (done) {
 
-      hierarchyBuilder(serviceLocator.sectionService)({}, function (err, hierarchy) {
+      hierarchyBuilder(sectionService)({}, function (err, hierarchy) {
         if (err) return done(err)
         teaserPopulator(hierarchy, 1, [ 'desired' ], function (err, sections) {
           if (err) return done(err)
@@ -270,7 +257,7 @@ describe('Teaser Populator', function () {
      */
     it('should not dedupe not visible articles from second desiredLists if maxListSize is defined', function (done) {
 
-      hierarchyBuilder(serviceLocator.sectionService)({}, function (err, hierarchy) {
+      hierarchyBuilder(sectionService)({}, function (err, hierarchy) {
         if (err) return done(err)
         teaserPopulator(hierarchy, 1, [ 'testTeaser', 'desired' ], 6, function (err, sections) {
           if (err) return done(err)
@@ -300,7 +287,7 @@ describe('Teaser Populator', function () {
      * lists, as the duplicated items will not be within the dedupe limit
      */
     it('should dedupe visible articles from second desiredLists if maxListSize is defined', function (done) {
-      hierarchyBuilder(serviceLocator.sectionService)({}, function (err, hierarchy) {
+      hierarchyBuilder(sectionService)({}, function (err, hierarchy) {
         if (err) return done(err)
         teaserPopulator(hierarchy, 1, [ 'testTeaser', 'desired' ], 2, function (err, sections) {
           if (err) return done(err)
@@ -320,6 +307,21 @@ describe('Teaser Populator', function () {
               section.teaserLists.desired.articles[1]._id.should.equal(articles[1][1].articleId)
             }
           })
+          done()
+        })
+      })
+    })
+
+    it('should callback with the error if dedupeListAggregator calls the cb with error', function (done) {
+      function aggregate(lists, dedupe, maxListSize, section, cb) {
+        cb(new Error('This is a list aggregator error'))
+      }
+
+      var testTeaserPopulator = createTeaserPopulator(aggregate)
+
+      hierarchyBuilder(sectionService)({}, function (err, hierarchy) {
+        testTeaserPopulator(hierarchy, 1, [ 'desired' ], function (err) {
+          err.message.should.equal('This is a list aggregator error')
           done()
         })
       })
