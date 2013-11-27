@@ -2,7 +2,7 @@
   "author": "Paul Serby",
   "name": "cf-teaser-populator",
   "description": "Descend through a section hierarchy building a structure of section.teaserLists articles for each section in the tree",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "tags": [],
   "repository": {
     "type": "git",
