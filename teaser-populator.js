@@ -61,7 +61,7 @@ function createTeaserPopulator(dedupeListAggregator) {
             var listNames = Array.isArray(desiredLists) ? desiredLists : Object.keys(section.teaserLists)
               , dedupe = doorman()
 
-            async.each(listNames, function (key, cb) {
+            async.eachSeries(listNames, function (key, cb) {
               var desiredList = section.teaserLists[key]
               // Call back if the section doesn't have the desired list
               if (!desiredList) return cb(null)
