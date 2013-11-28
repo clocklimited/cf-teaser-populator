@@ -25,7 +25,6 @@
   "dependencies": {
     "async": "~0.2.9",
     "doorman": "0.0.2",
-    "uber-cache": "~0.3.1",
     "lodash": "~2.4.0"
   },
   "devDependencies": {
@@ -41,6 +40,7 @@
     "crud-service": "0.0.5",
     "mc-logger": "0.0.0",
     "save-mongodb": "0.0.11",
-    "cf-dedupe-list-aggregator": "0.0.3"
+    "cf-dedupe-list-aggregator": "0.0.3",
+    "schemata": "~1.0.0"
   }
 }

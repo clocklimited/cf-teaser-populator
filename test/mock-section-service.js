@@ -22,8 +22,7 @@ function getQuery(query) {
 
 module.exports = function(saveEngine) {
   var sectionSave = save('section', { engine: saveEngine, debug: false, logger: logger })
-    , schema = require('fleet-street/bundles/section/schema')([], sectionSave)
-    , liteSchema = require('fleet-street/bundles/section/lite-schema')()
+    , schema = require('./mock-section-schema')()
     , service = crudService('section', sectionSave, schema)
 
   service.findPublic = function (query, options, callback) {
@@ -42,15 +41,11 @@ module.exports = function(saveEngine) {
       var currentDepth = depth ? depth : 1
       if (section.parent === parent) {
 
-        var item = liteSchema.stripUnknownProperties(liteSchema.makeDefault(section))
-
-        item.subItems = []
-
         if (maxDepth !== currentDepth) {
-          item.subItems = service.getChildSections(section._id, sections, maxDepth, currentDepth + 1)
+          section.subItems = service.getChildSections(section._id, sections, maxDepth, currentDepth + 1)
         }
 
-        items.push(item)
+        items.push(section)
       }
     })
 

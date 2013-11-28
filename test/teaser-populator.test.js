@@ -1,13 +1,13 @@
-var articleFixtures = require('fleet-street/test/article/fixtures')
+var articleFixture = require('./mock-article-fixture')
   , async = require('async')
   , should = require('should')
   , saveMongodb = require('save-mongodb')
   , _ = require('lodash')
   , nullLogger = require('mc-logger')
-  // , uberCache = require('uber-cache')
   , createTeaserPopulator = require('../teaser-populator')
   , createDedupeAggregator = require('cf-dedupe-list-aggregator')
   , teaserPopulator
+  // TODO: remove hierarchy builder when it is a separate module
   , hierarchyBuilder = require('fleet-street/lib/hierarchy-builders/section')
   , slugUniquer = 1
   // Global to allow checks once articles are created
@@ -15,7 +15,6 @@ var articleFixtures = require('fleet-street/test/article/fixtures')
   , dbConnect = require('./db-connection')
   , sectionService
   , articleService
-  , tagService
   , listService
 
 function createSections(lists, cb) {
@@ -24,18 +23,16 @@ function createSections(lists, cb) {
       [ { name: 'Home'
         , visible: true
         , slug: 'home'
-        , displayInNav: true
         , order: 1
         , teaserLists: { testTeaser: { lists: [ lists[0]._id ] }, desired: { lists: [ lists[1]._id ] } }
         }
-      , { name: 'Section A', visible: true, slug: 'A', displayInNav: true, order: 2 }
+      , { name: 'Section A', visible: true, slug: 'A', order: 2 }
       , { name: 'Section B'
         , visible: true
         , slug: 'B'
-        , displayInNav: true
         , order: 3
         , teaserLists: { testTeaser: { lists: [ lists[0]._id ] } } }
-      , { name: 'Section C', visible: true, slug: 'C', displayInNav: true, order: 4 }
+      , { name: 'Section C', visible: true, slug: 'C', order: 4 }
       ]
   async.map(topLevel, sectionService.create, function (err, results) {
     var secondLevel =
@@ -124,9 +121,9 @@ function createList(cb) {
   })
 }
 
-function publishedArticleMaker(articles, custom) {
+function publishedArticleMaker(articles) {
   return function (cb) {
-    var model = _.extend({}, articleFixtures.validNewPublishedModel, custom)
+    var model = _.extend({}, articleFixture)
 
     // Make slug unique to stop validation errors (slug and section unique)
     model.slug += slugUniquer
@@ -134,7 +131,7 @@ function publishedArticleMaker(articles, custom) {
 
     articleService.create(model, function (err, result) {
       if (err) return cb(err)
-      articles.push(_.extend({}, { articleId: result._id }, custom))
+      articles.push(_.extend({}, { articleId: result._id }))
       cb(null)
     })
   }
@@ -153,11 +150,8 @@ describe('Teaser Populator', function () {
       }
 
       articleService = require('./mock-article-service')(persistence('article'))
-      tagService = require('./mock-tag-service')(persistence('tag'))
       sectionService = require('./mock-section-service')(persistence('section'))
       listService = require('./mock-list-service')
-
-        // .register('cache', uberCache())
 
       var aggregate = createDedupeAggregator(listService, sectionService,
         articleService, { logger: nullLogger })
@@ -165,10 +159,7 @@ describe('Teaser Populator', function () {
       teaserPopulator = createTeaserPopulator(aggregate)
       createList(function (err, lists) {
         if (err) return done(err)
-        createSections(lists, function (err) {
-          if (err) return done(err)
-          done()
-        })
+        createSections(lists, done)
       })
     })
 

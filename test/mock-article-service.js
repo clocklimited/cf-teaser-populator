@@ -21,10 +21,8 @@ function createPublicQuery(query, options) {
 }
 
 module.exports = function(saveEngine) {
-  var articleSave = save('article',
-      // Create a unique name for the memgo engine so it always starts empty.
-      { engine: saveEngine, debug: false, logger: logger })
-    , schema = require('fleet-street/bundles/article/article-schema')([], articleSave)
+  var articleSave = save('article', { engine: saveEngine, debug: false, logger: logger })
+    , schema = require('./mock-article-schema')()
     , service = crudService('article', articleSave, schema)
 
   // Find the articles that are available to the public
