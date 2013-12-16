@@ -2,12 +2,15 @@ var MongoClient = require('mongodb').MongoClient
   , dbConnection
   , connectionTimes = 0
   , timesCalled = 0
+  , mongoHost = process.env.NODE_MONGO_HOST || '127.0.0.1'
+  , mongoPort = process.env.NODE_MONGO_PORT || 27017
 
 module.exports.connect = function(done) {
   connectionTimes += 1
   if (dbConnection) return done(null, dbConnection)
 
-  MongoClient.connect('mongodb://127.0.0.1/cf-teaser-populator-tests', function (error, db) {
+  var mongoConnectionString = 'mongodb://' + mongoHost + ':' + mongoPort + '/cf-teaser-populator-tests'
+  MongoClient.connect(mongoConnectionString, function (error, db) {
 
     dbConnection = db
 
