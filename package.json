@@ -23,24 +23,24 @@
     "node": ">=0.8"
   },
   "dependencies": {
-    "async": "~0.2.9",
+    "async": "~3.1.0",
     "doorman": "0.0.2",
-    "lodash": "~2.4.0"
+    "lodash": "~4.17.11"
   },
   "devDependencies": {
-    "mocha": "1",
-    "should": "2",
+    "mocha": "^6.1.4",
+    "should": "^13.2.3",
     "istanbul": "0",
     "jshint": "2",
-    "jshint-full-path": "0",
-    "service-locator": "0.0.2",
+    "jshint-full-path": "^1.1.1",
+    "service-locator": "1.0.0",
     "fleet-street": "~2.0.1",
-    "mongodb": "~1.3.20",
-    "save": "0.0.20",
-    "crud-service": "0.0.5",
+    "mongodb": "~3.2.7",
+    "save": "2.4.0",
+    "crud-service": "1.1.2",
     "mc-logger": "0.0.0",
-    "save-mongodb": "0.0.11",
+    "save-mongodb": "2.1.0",
     "cf-dedupe-list-aggregator": "0.0.3",
-    "schemata": "~1.0.0"
+    "schemata": "~7.0.1"
   }
 }
