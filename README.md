@@ -1,5 +1,7 @@
 # cf-teaser-populator
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/clocklimited/cf-teaser-populator.svg)](https://greenkeeper.io/)
+
 Descend through a section hierarchy builing a structure of section.teaserLists articles for each section in the tree
 
 ## Installation
