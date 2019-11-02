@@ -25,7 +25,7 @@
   "dependencies": {
     "async": "~0.2.9",
     "doorman": "0.0.2",
-    "lodash": "~2.4.0"
+    "lodash": "~4.17.15"
   },
   "devDependencies": {
     "mocha": "1",
