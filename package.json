@@ -35,7 +35,7 @@
     "jshint-full-path": "0",
     "service-locator": "0.0.2",
     "fleet-street": "~2.0.1",
-    "mongodb": "~1.3.20",
+    "mongodb": "~3.6.1",
     "save": "0.0.20",
     "crud-service": "0.0.5",
     "mc-logger": "0.0.0",
